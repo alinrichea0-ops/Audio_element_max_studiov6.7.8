@@ -85,11 +85,11 @@ class MainActivity : Activity() {
     }
 
     private fun row(): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            baselineAligned = false
-        }
+    return LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        isBaselineAligned = false
+    }
     }
 
     private fun column(): LinearLayout {
