@@ -97,9 +97,8 @@ class MainActivity : Activity() {
                     action()
                 }
                 .start()
-        }
-    }
-    }
+          }
+       }
     }
 
     private fun row(): LinearLayout {
