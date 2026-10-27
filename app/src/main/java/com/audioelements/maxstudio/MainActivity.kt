@@ -110,6 +110,14 @@ class MainActivity : Activity() {
                 }
             )
         }
+        root.addView(
+    workspace,
+    LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        0,
+        1f
+    )
+)
         root.addView(top)
 
         // TRANSPORT BAR
