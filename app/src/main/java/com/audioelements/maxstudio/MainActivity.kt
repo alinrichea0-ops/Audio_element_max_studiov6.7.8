@@ -89,13 +89,13 @@ class MainActivity : Activity() {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         isBaselineAligned = false
-    }
+        }
     }
 
     private fun column(): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            baselineAligned = false
+    return LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        isBaselineAligned = false
         }
     }
 
