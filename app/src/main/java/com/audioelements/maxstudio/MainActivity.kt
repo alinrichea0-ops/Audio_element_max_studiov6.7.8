@@ -110,14 +110,6 @@ class MainActivity : Activity() {
                 }
             )
         }
-        root.addView(
-    workspace,
-    LinearLayout.LayoutParams(
-        LinearLayout.LayoutParams.MATCH_PARENT,
-        0,
-        1f
-    )
-)
         root.addView(top)
 
         // TRANSPORT BAR
@@ -247,11 +239,14 @@ class MainActivity : Activity() {
             timelineArea,
             LinearLayout.LayoutParams(0, -1, 1f)
         )
-
         root.addView(
-            workspace,
-            LinearLayout.LayoutParams(0, 0, 1f)
-        )
+    workspace,
+    LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        0,
+        1f
+    )
+)
 
         // MIXER PANEL
         mixerContainer = LinearLayout(this).apply {
