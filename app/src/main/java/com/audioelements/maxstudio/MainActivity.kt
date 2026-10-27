@@ -61,15 +61,45 @@ class MainActivity : Activity() {
     }
 
     private fun button(
-        label: String,
-        action: () -> Unit
-    ): Button {
-        return Button(this).apply {
-            text = label
-            isAllCaps = false
-            textSize = 12f
-            setOnClickListener { action() }
+    label: String,
+    action: () -> Unit
+): Button {
+    return Button(this).apply {
+        text = label
+        isAllCaps = false
+        textSize = 12f
+        setTextColor(Color.WHITE)
+
+        backgroundTintList =
+            android.content.res.ColorStateList.valueOf(
+                when (label.uppercase()) {
+                    "● REC" -> Color.rgb(190, 45, 55)
+                    "▶ PLAY" -> Color.rgb(0, 145, 130)
+                    "Ⅱ PAUSE" -> Color.rgb(65, 75, 90)
+                    "■ STOP" -> Color.rgb(75, 80, 90)
+                    else -> Color.rgb(38, 43, 52)
+                }
+            )
+
+        setPadding(12, 8, 12, 8)
+
+        setOnClickListener {
+            animate()
+                .scaleX(0.96f)
+                .scaleY(0.96f)
+                .setDuration(80)
+                .withEndAction {
+                    animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(80)
+                        .start()
+                    action()
+                }
+                .start()
         }
+    }
+    }
     }
 
     private fun row(): LinearLayout {
