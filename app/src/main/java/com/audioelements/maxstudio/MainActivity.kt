@@ -2,11 +2,14 @@ package com.audioelements.maxstudio
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -22,28 +25,38 @@ class MainActivity : Activity() {
     private lateinit var root: LinearLayout
     private lateinit var trackContainer: LinearLayout
     private lateinit var mixerContainer: LinearLayout
+    private lateinit var pianoContainer: LinearLayout
+    private lateinit var pianoNotes: PianoRollView
     private lateinit var statusText: TextView
-    private lateinit var timelineContent: LinearLayout
+    private lateinit var timerText: TextView
 
     private var mixerVisible = true
+    private var pianoVisible = true
     private var selectedTrack = 0
-    private var trackCounter = 3
+    private var trackCounter = 5
+    private var zoom = 1
 
     private val tracks = mutableListOf(
-        "Vocal",
-        "Beat",
-        "Keyboard"
+        Track("Vocal", Color.rgb(0, 210, 150)),
+        Track("Beat", Color.rgb(0, 135, 255)),
+        Track("Keyboard", Color.rgb(126, 48, 255)),
+        Track("Guitar", Color.rgb(255, 145, 20)),
+        Track("Bass", Color.rgb(255, 35, 90))
     )
 
-    private val bg = Color.rgb(17, 20, 26)
-    private val panel = Color.rgb(28, 33, 41)
-    private val panelLight = Color.rgb(40, 47, 57)
-    private val accent = Color.rgb(0, 210, 174)
-    private val white = Color.rgb(240, 244, 248)
-    private val muted = Color.rgb(145, 157, 173)
-    private val line = Color.rgb(54, 63, 75)
-    private val red = Color.rgb(200, 55, 67)
-    private val blue = Color.rgb(83, 155, 224)
+    private val bg = Color.rgb(7, 17, 30)
+    private val panel = Color.rgb(12, 29, 48)
+    private val panelLight = Color.rgb(22, 43, 66)
+    private val border = Color.rgb(38, 66, 92)
+    private val accent = Color.rgb(0, 240, 211)
+    private val white = Color.rgb(235, 245, 255)
+    private val muted = Color.rgb(144, 171, 196)
+    private val red = Color.rgb(230, 34, 70)
+
+    data class Track(
+        val name: String,
+        val color: Int
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,25 +70,37 @@ class MainActivity : Activity() {
         buildInterface()
     }
 
-    private fun dp(value: Int): Int {
-        return (
-            value * resources.displayMetrics.density
-        ).toInt()
-    }
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
-    private fun rounded(
+    private fun shape(
         color: Int,
-        radius: Int = 8
+        radius: Int = 8,
+        stroke: Int = border
     ): GradientDrawable {
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = dp(radius).toFloat()
+            setStroke(dp(1), stroke)
         }
     }
 
-    private fun label(
+    private fun row(): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isBaselineAligned = false
+        }
+
+    private fun column(): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            isBaselineAligned = false
+        }
+
+    private fun text(
         value: String,
-        size: Float = 12f,
+        size: Float = 11f,
         color: Int = white,
         bold: Boolean = false
     ): TextView {
@@ -84,318 +109,156 @@ class MainActivity : Activity() {
             textSize = size
             setTextColor(color)
             gravity = Gravity.CENTER
-
-            if (bold) {
-                typeface = Typeface.DEFAULT_BOLD
-            }
-
-            setPadding(
-                dp(4),
-                dp(3),
-                dp(4),
-                dp(3)
-            )
+            if (bold) typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(3), dp(2), dp(3), dp(2))
         }
     }
 
-    private fun row(): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            isBaselineAligned = false
-        }
-    }
-
-    private fun column(): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            isBaselineAligned = false
-        }
-    }
-
-    private fun makeButton(
-        title: String,
+    private fun button(
+        value: String,
         color: Int = panelLight,
         action: () -> Unit
     ): Button {
         return Button(this).apply {
-            text = title
+            text = value
             textSize = 10f
             isAllCaps = false
             setTextColor(white)
-
-            backgroundTintList =
-                android.content.res.ColorStateList.valueOf(color)
-
-            minHeight = dp(36)
-            minimumHeight = dp(36)
+            background = shape(color, 7)
             minWidth = 0
             minimumWidth = 0
-
-            setPadding(
-                dp(3),
-                0,
-                dp(3),
-                0
-            )
-
-            setOnClickListener {
-                action()
-            }
+            minHeight = dp(34)
+            minimumHeight = dp(34)
+            setPadding(dp(4), 0, dp(4), 0)
+            setOnClickListener { action() }
         }
     }
 
     private fun addButton(
         parent: LinearLayout,
-        title: String,
+        value: String,
         color: Int = panelLight,
         weight: Float = 1f,
         action: () -> Unit
     ) {
         parent.addView(
-            makeButton(title, color, action),
+            button(value, color, action),
             LinearLayout.LayoutParams(
-                0,
-                dp(39),
-                weight
+                0, dp(37), weight
             ).apply {
-                setMargins(
-                    dp(2),
-                    dp(2),
-                    dp(2),
-                    dp(2)
-                )
+                setMargins(dp(2), dp(2), dp(2), dp(2))
             }
         )
     }
 
-    private fun message(text: String) {
-        Toast.makeText(
-            this,
-            text,
-            Toast.LENGTH_SHORT
-        ).show()
+    private fun toast(value: String) {
+        Toast.makeText(this, value, Toast.LENGTH_SHORT).show()
     }
 
     private fun buildInterface() {
-        root = column().apply {
-            setBackgroundColor(bg)
-        }
-
+        root = column().apply { setBackgroundColor(bg) }
         setContentView(root)
 
-        buildTopBar()
-        buildTransportBar()
-        buildToolsBar()
-        buildWorkspace()
-        buildMixer()
+        buildHeader()
+        buildTransport()
+        buildTools()
 
-        refreshTracks()
-    }
-
-    // --------------------------------------------------
-    // TOP BAR
-    // --------------------------------------------------
-
-    private fun buildTopBar() {
-        val top = row().apply {
-            setBackgroundColor(panel)
-            setPadding(
-                dp(6),
-                dp(2),
-                dp(6),
-                dp(2)
-            )
-        }
-
-        top.addView(
-            label(
-                "AUDIO ELEMENTS MAX",
-                14f,
-                accent,
-                true
-            ),
-            LinearLayout.LayoutParams(
-                0,
-                dp(43),
-                2.2f
-            )
-        )
-
-        addButton(
-            top,
-            "PROJECT",
-            panelLight,
-            1f
-        ) {
-            message("Audio Elements Max Studio")
-        }
-
-        addButton(
-            top,
-            "UNDO",
-            panelLight,
-            0.7f
-        ) {
-            message("Undo mbola tsy ampidirina")
-        }
-
-        addButton(
-            top,
-            "REDO",
-            panelLight,
-            0.7f
-        ) {
-            message("Redo mbola tsy ampidirina")
-        }
-
+        val main = column()
         root.addView(
-            top,
-            LinearLayout.LayoutParams(
-                -1,
-                dp(47)
-            )
+            main,
+            LinearLayout.LayoutParams( -1, 0, 1f )
         )
+
+        buildArrangement(main)
+        buildPianoRoll(main)
+        buildMixer()
     }
 
-    // --------------------------------------------------
-    // TRANSPORT BAR
-    // --------------------------------------------------
+    private fun buildHeader() {
+        val header = row().apply {
+            setPadding(dp(5), dp(2), dp(5), dp(2))
+            setBackgroundColor(panel)
+        }
 
-    private fun buildTransportBar() {
+        header.addView(
+            text("♫ AUDIO ELEMENTS MAX", 15f, accent, true),
+            LinearLayout.LayoutParams(0, dp(43), 2.5f)
+        )
+
+        addButton(header, "PROJECT", panelLight, 1f) {
+            toast("Audio Elements Max Studio")
+        }
+
+        addButton(header, "UNDO", panelLight, 0.7f) {
+            toast("Undo mbola tsy ampidirina")
+        }
+
+        addButton(header, "REDO", panelLight, 0.7f) {
+            toast("Redo mbola tsy ampidirina")
+        }
+
+        addButton(header, "⚙", panelLight, 0.45f) {
+            toast("Settings mbola hatsaraina")
+        }
+
+        root.addView(header, LinearLayout.LayoutParams(-1, dp(46)))
+    }
+
+    private fun buildTransport() {
         val bar = row().apply {
-            setPadding(
-                dp(4),
-                dp(2),
-                dp(4),
-                dp(2)
-            )
+            setPadding(dp(5), dp(2), dp(5), dp(2))
         }
 
-        addButton(
-            bar,
-            "● REC",
-            red,
-            0.9f
-        ) {
-            message("REC mbola mila audio engine")
+        addButton(bar, "● REC", red, 0.9f) {
+            toast("REC: mila audio engine")
         }
 
-        addButton(
-            bar,
-            "▶ PLAY",
-            Color.rgb(0, 112, 96),
-            1f
-        ) {
-            message("PLAY mbola mila audio engine")
+        addButton(bar, "▶ PLAY", Color.rgb(0, 135, 105), 1f) {
+            toast("PLAY: mila audio engine")
         }
 
-        addButton(
-            bar,
-            "Ⅱ PAUSE",
-            panelLight,
-            1f
-        ) {
-            message("PAUSE mbola tsy ampidirina")
+        addButton(bar, "Ⅱ PAUSE", panelLight, 1f) {
+            toast("PAUSE mbola tsy ampidirina")
         }
 
-        addButton(
-            bar,
-            "■ STOP",
-            panelLight,
-            0.9f
-        ) {
-            message("STOP")
+        addButton(bar, "■ STOP", panelLight, 0.9f) {
+            timerText.text = "00:00:00"
+            toast("STOP")
         }
+
+        timerText = text("00:00:00", 17f, accent, true)
+        timerText.background = shape(Color.rgb(3, 13, 24), 7)
 
         bar.addView(
-            label(
-                "00:00:00",
-                13f,
-                accent,
-                true
-            ),
-            LinearLayout.LayoutParams(
-                0,
-                dp(38),
-                1.1f
-            )
+            timerText,
+            LinearLayout.LayoutParams(0, dp(39), 1.5f)
         )
 
-        addButton(
-            bar,
-            "+ TRACK",
-            accent,
-            1f
-        ) {
-            addTrack()
+        addButton(bar, "+ TRACK", accent, 1f) { addTrack() }
+
+        addButton(bar, "MIXER", panelLight, 0.9f) {
+            mixerVisible = !mixerVisible
+            mixerContainer.visibility =
+                if (mixerVisible) View.VISIBLE else View.GONE
         }
 
-        addButton(
-            bar,
-            "MIXER",
-            panelLight,
-            0.9f
-        ) {
-            toggleMixer()
-        }
-
-        root.addView(
-            bar,
-            LinearLayout.LayoutParams(
-                -1,
-                dp(44)
-            )
-        )
+        root.addView(bar, LinearLayout.LayoutParams(-1, dp(45)))
     }
 
-    private fun toggleMixer() {
-        mixerVisible = !mixerVisible
-
-        mixerContainer.visibility =
-            if (mixerVisible) View.VISIBLE
-            else View.GONE
-
-        message(
-            if (mixerVisible) {
-                "Mixer aseho"
-            } else {
-                "Mixer nafenina"
-            }
-        )
-    }
-
-    // --------------------------------------------------
-    // EDITING TOOLBAR
-    // --------------------------------------------------
-
-    private fun buildToolsBar() {
+    private fun buildTools() {
         val tools = row().apply {
             setBackgroundColor(panel)
-            setPadding(
-                dp(3),
-                dp(2),
-                dp(3),
-                dp(2)
-            )
+            setPadding(dp(3), dp(2), dp(3), dp(2))
         }
 
-        val names = listOf(
-            "SELECT",
-            "CUT",
-            "COPY",
-            "PASTE",
-            "MOVE",
-            "DELETE",
-            "ZOOM +",
-            "ZOOM -"
-        )
-
-        names.forEach { name ->
+        listOf(
+            "SELECT", "CUT", "COPY", "PASTE",
+            "MOVE", "DELETE", "ZOOM +", "ZOOM -"
+        ).forEach { name ->
             addButton(
                 tools,
                 name,
-                if (name == "SELECT") accent
+                if (name == "SELECT") Color.rgb(0, 130, 125)
                 else panelLight,
                 1f
             ) {
@@ -403,216 +266,79 @@ class MainActivity : Activity() {
             }
         }
 
-        root.addView(
-            tools,
-            LinearLayout.LayoutParams(
-                -1,
-                dp(44)
-            )
-        )
+        root.addView(tools, LinearLayout.LayoutParams(-1, dp(43)))
     }
 
-    // --------------------------------------------------
-    // MAIN WORKSPACE
-    // --------------------------------------------------
-
-    private fun buildWorkspace() {
-        val workspace = row().apply {
+    private fun buildArrangement(parent: LinearLayout) {
+        val area = row().apply {
             gravity = Gravity.TOP
         }
 
-        buildTrackPanel(workspace)
-        buildTimeline(workspace)
-
-        root.addView(
-            workspace,
-            LinearLayout.LayoutParams(
-                -1,
-                0,
-                1f
-            )
-        )
-    }
-
-    // --------------------------------------------------
-    // TRACK SIDEBAR
-    // --------------------------------------------------
-
-    private fun buildTrackPanel(
-        parent: LinearLayout
-    ) {
-        val side = column().apply {
+        val sidebar = column().apply {
             setBackgroundColor(panel)
         }
 
-        side.addView(
-            label(
-                "TRACKS",
-                13f,
-                accent,
-                true
-            ),
-            LinearLayout.LayoutParams(
-                -1,
-                dp(38)
-            )
+        sidebar.addView(
+            text("TRACKS", 12f, accent, true),
+            LinearLayout.LayoutParams(-1, dp(32))
         )
 
-        side.addView(
-            makeButton("+ ADD TRACK", panelLight) {
-                addTrack()
-            },
-            LinearLayout.LayoutParams(
-                -1,
-                dp(36)
-            ).apply {
-                setMargins(
-                    dp(4),
-                    dp(2),
-                    dp(4),
-                    dp(3)
-                )
-            }
-        )
-
-        side.addView(
-            makeButton("IMPORT AUDIO", panelLight) {
-                message("Import Audio mbola tsy ampidirina")
-            },
-            LinearLayout.LayoutParams(
-                -1,
-                dp(36)
-            ).apply {
-                setMargins(
-                    dp(4),
-                    dp(2),
-                    dp(4),
-                    dp(3)
-                )
-            }
-        )
-
-        statusText = label(
-            "Ready",
-            10f,
-            muted
-        )
-
-        side.addView(
+        statusText = text("Ready", 9f, muted)
+        sidebar.addView(
             statusText,
-            LinearLayout.LayoutParams(
-                -1,
-                dp(35)
-            )
+            LinearLayout.LayoutParams(-1, dp(23))
         )
 
-        parent.addView(
-            side,
-            LinearLayout.LayoutParams(
-                dp(145),
-                -1
-            )
+        sidebar.addView(
+            button("+ ADD TRACK", panelLight) { addTrack() },
+            LinearLayout.LayoutParams(-1, dp(35))
         )
 
-        parent.addView(
-            View(this).apply {
-                setBackgroundColor(line)
+        sidebar.addView(
+            button("KEYBOARD / PIANO", panelLight) {
+                pianoVisible = !pianoVisible
+                pianoContainer.visibility =
+                    if (pianoVisible) View.VISIBLE else View.GONE
             },
-            LinearLayout.LayoutParams(
-                dp(1),
-                -1
-            )
+            LinearLayout.LayoutParams(-1, dp(35))
         )
-    }
 
-    // --------------------------------------------------
-    // ARRANGEMENT TIMELINE
-    // --------------------------------------------------
+        area.addView(
+            sidebar,
+            LinearLayout.LayoutParams(dp(150), -1)
+        )
 
-    private fun buildTimeline(
-        parent: LinearLayout
-    ) {
-        val area = column().apply {
+        val timelineArea = column().apply {
             setBackgroundColor(bg)
         }
 
-        area.addView(
-            label(
-                "ARRANGEMENT  /  MULTI-TRACK",
-                12f,
-                accent,
-                true
-            ),
-            LinearLayout.LayoutParams(
-                -1,
-                dp(35)
-            )
+        timelineArea.addView(
+            text("ARRANGEMENT / MULTI-TRACK", 12f, accent, true),
+            LinearLayout.LayoutParams(-1, dp(32))
         )
 
         val horizontal = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = true
             setBackgroundColor(panel)
-            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
         }
 
-        timelineContent = row()
+        val timeline = column()
 
-        for (bar in 1..64) {
-            val cell = column().apply {
-                gravity = Gravity.CENTER
-                setBackgroundColor(
-                    if ((bar - 1) % 4 == 0) {
-                        panelLight
-                    } else {
-                        panel
-                    }
-                )
-            }
-
-            cell.addView(
-                label(
-                    bar.toString(),
-                    10f,
-                    muted,
-                    true
-                ),
-                LinearLayout.LayoutParams(
-                    dp(76),
-                    dp(31)
-                )
-            )
-
-            timelineContent.addView(
-                cell,
-                LinearLayout.LayoutParams(
-                    dp(76),
-                    dp(31)
-                )
+        val ruler = row()
+        for (bar in 1..32) {
+            ruler.addView(
+                text(bar.toString(), 10f, muted, true),
+                LinearLayout.LayoutParams(dp(70 * zoom), dp(26))
             )
         }
+        timeline.addView(ruler)
 
-        horizontal.addView(
-            timelineContent,
-            ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        )
-
-        area.addView(
-            horizontal,
-            LinearLayout.LayoutParams(
-                -1,
-                dp(32)
-            )
-        )
+        trackContainer = column()
 
         val vertical = ScrollView(this).apply {
             isFillViewport = false
             isVerticalScrollBarEnabled = true
         }
-
-        trackContainer = column()
 
         vertical.addView(
             trackContainer,
@@ -622,174 +348,283 @@ class MainActivity : Activity() {
             )
         )
 
-        area.addView(
+        timeline.addView(
             vertical,
-            LinearLayout.LayoutParams(
-                -1,
-                0,
-                1f
+            LinearLayout.LayoutParams(-1, dp(255))
+        )
+
+        horizontal.addView(
+            timeline,
+            ViewGroup.LayoutParams(
+                dp(70 * zoom * 32),
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
+        )
+
+        timelineArea.addView(
+            horizontal,
+            LinearLayout.LayoutParams(-1, -1)
+        )
+
+        area.addView(
+            timelineArea,
+            LinearLayout.LayoutParams(0, -1, 1f)
         )
 
         parent.addView(
             area,
-            LinearLayout.LayoutParams(
-                0,
-                -1,
-                1f
-            )
+            LinearLayout.LayoutParams(-1, 0, 1.6f)
         )
-    }
 
-    // --------------------------------------------------
-    // TRACKS
-    // --------------------------------------------------
+        refreshTracks()
+    }
 
     private fun refreshTracks() {
         if (!::trackContainer.isInitialized) return
 
         trackContainer.removeAllViews()
 
-        tracks.forEachIndexed { index, name ->
-
-            val trackRow = row().apply {
+        tracks.forEachIndexed { index, track ->
+            val lane = row().apply {
                 setBackgroundColor(
                     if (index == selectedTrack) {
-                        Color.rgb(38, 58, 64)
-                    } else if (index % 2 == 0) {
+                        Color.rgb(19, 49, 61)
+                    } else {
                         bg
-                    } else {
-                        panel
                     }
                 )
             }
 
-            val trackName = TextView(this).apply {
-                text = name
-                textSize = 11f
-
-                setTextColor(
-                    if (index == selectedTrack) {
-                        accent
-                    } else {
-                        white
-                    }
-                )
-
-                gravity = Gravity.CENTER
-
-                setPadding(
-                    dp(3),
-                    dp(3),
-                    dp(3),
-                    dp(3)
-                )
-
-                setOnClickListener {
-                    selectTrack(index)
-                }
-            }
-
-            trackRow.addView(
-                trackName,
-                LinearLayout.LayoutParams(
-                    dp(105),
-                    dp(61)
-                )
+            val name = text(
+                track.name,
+                10f,
+                if (index == selectedTrack) accent else white,
+                true
             )
 
-            val clipColor =
-                if (index % 2 == 0) {
-                    Color.rgb(64, 187, 155)
-                } else {
-                    blue
-                }
+            name.setOnClickListener {
+                selectedTrack = index
+                statusText.text = "Selected: ${track.name}"
+                refreshTracks()
+            }
+
+            lane.addView(
+                name,
+                LinearLayout.LayoutParams(dp(82), dp(52))
+            )
 
             val clip = TextView(this).apply {
-                text = "━━━━ AUDIO CLIP ━━━━"
+                text = when (track.name) {
+                    "Vocal" -> "Vocal_01     ∿ ∿ ∿ ∿ ∿ ∿ ∿"
+                    "Beat" -> "Beat_01      ▥ ▥ ▥ ▥ ▥ ▥"
+                    "Keyboard" -> "Keyboard_01   ▰ ▱ ▰ ▱ ▰ ▱"
+                    "Guitar" -> "Guitar_01     ∿ ∿ ∿ ∿ ∿"
+                    "Bass" -> "Bass_01       ∿ ∿ ∿ ∿ ∿ ∿"
+                    else -> "${track.name}_01"
+                }
+
                 textSize = 10f
-                typeface = Typeface.DEFAULT_BOLD
-
-                setTextColor(
-                    Color.rgb(15, 29, 32)
-                )
-
-                gravity = Gravity.CENTER
-
-                background = rounded(
-                    clipColor,
-                    5
-                )
+                setTextColor(Color.WHITE)
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(7), dp(3), dp(7), dp(3))
+                background = shape(track.color, 5, track.color)
 
                 setOnClickListener {
-                    selectTrack(index)
-                    message("$name nofidina")
+                    selectedTrack = index
+                    statusText.text = "${track.name} clip selected"
+                    refreshTracks()
                 }
             }
 
-            trackRow.addView(
+            lane.addView(
                 clip,
                 LinearLayout.LayoutParams(
-                    dp(250),
+                    dp(if (index == 1) 380 else 280),
                     dp(40)
                 ).apply {
-                    setMargins(
-                        dp(4),
-                        dp(4),
-                        dp(4),
-                        dp(4)
-                    )
+                    setMargins(dp(3), dp(4), dp(3), dp(4))
                 }
-            )
-
-            val remaining = View(this).apply {
-                setBackgroundColor(
-                    if (index % 2 == 0) bg
-                    else panel
-                )
-            }
-
-            trackRow.addView(
-                remaining,
-                LinearLayout.LayoutParams(
-                    0,
-                    dp(61),
-                    1f
-                )
             )
 
             trackContainer.addView(
-                trackRow,
-                LinearLayout.LayoutParams(
-                    -1,
-                    dp(62)
-                )
+                lane,
+                LinearLayout.LayoutParams(-1, dp(53))
             )
 
             trackContainer.addView(
                 View(this).apply {
-                    setBackgroundColor(line)
+                    setBackgroundColor(border)
                 },
-                LinearLayout.LayoutParams(
-                    -1,
-                    dp(1)
-                )
+                LinearLayout.LayoutParams(-1, dp(1))
             )
         }
     }
 
-    private fun selectTrack(index: Int) {
-        if (index !in tracks.indices) return
+    private fun buildPianoRoll(parent: LinearLayout) {
+        pianoContainer = column().apply {
+            setBackgroundColor(panel)
+            background = shape(panel, 6)
+        }
 
-        selectedTrack = index
-        statusText.text = "Selected: ${tracks[index]}"
+        val header = row()
 
-        refreshTracks()
+        header.addView(
+            text("♬ KEYBOARD / PIANO ROLL", 11f, accent, true),
+            LinearLayout.LayoutParams(0, dp(29), 1f)
+        )
+
+        addButton(header, "OCT −", panelLight, 0.7f) {
+            pianoNotes.octave = (pianoNotes.octave - 1).coerceAtLeast(1)
+            pianoNotes.invalidate()
+        }
+
+        addButton(header, "OCT +", panelLight, 0.7f) {
+            pianoNotes.octave = (pianoNotes.octave + 1).coerceAtMost(7)
+            pianoNotes.invalidate()
+        }
+
+        pianoContainer.addView(header)
+
+        pianoNotes = PianoRollView()
+        pianoContainer.addView(
+            pianoNotes,
+            LinearLayout.LayoutParams(-1, dp(110))
+        )
+
+        parent.addView(
+            pianoContainer,
+            LinearLayout.LayoutParams(-1, 0, 0.85f)
+        )
     }
 
-    // --------------------------------------------------
-    // MIXER
-    // --------------------------------------------------
+    private inner class PianoRollView : View(this@MainActivity) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val notePositions = mutableListOf<Pair<Int, Int>>()
+
+        var octave = 4
+
+        private val blackKeys = setOf(1, 3, 6, 8, 10)
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+
+            val keyWidth = dp(43).toFloat()
+            val labelWidth = dp(36).toFloat()
+            val rowHeight = dp(13).toFloat()
+            val availableWidth = width - labelWidth
+
+            canvas.drawColor(Color.rgb(7, 18, 32))
+
+            for (note in 0 until 12) {
+                val y = note * rowHeight
+                val pitch = (11 - note)
+
+                paint.color = if (pitch % 12 in blackKeys) {
+                    Color.rgb(25, 36, 51)
+                } else {
+                    Color.rgb(210, 222, 233)
+                }
+
+                canvas.drawRect(
+                    0f, y, labelWidth, y + rowHeight, paint
+                )
+
+                paint.color = Color.rgb(20, 37, 56)
+                canvas.drawRect(
+                    labelWidth,
+                    y,
+                    width.toFloat(),
+                    y + rowHeight,
+                    paint
+                )
+
+                paint.color = Color.rgb(45, 67, 91)
+                canvas.drawLine(
+                    0f, y + rowHeight,
+                    width.toFloat(), y + rowHeight,
+                    paint
+                )
+            }
+
+            val columns = (availableWidth / keyWidth).toInt() + 1
+
+            for (column in 0..columns) {
+                val x = labelWidth + column * keyWidth
+
+                paint.color = if (column % 4 == 0) {
+                    Color.rgb(48, 74, 100)
+                } else {
+                    Color.rgb(27, 46, 68)
+                }
+
+                canvas.drawLine(
+                    x, 0f, x, height.toFloat(), paint
+                )
+            }
+
+            paint.color = Color.rgb(161, 84, 255)
+
+            notePositions.forEach { (column, row) ->
+                val left = labelWidth + column * keyWidth + dp(2)
+                val top = row * rowHeight + dp(1)
+
+                canvas.drawRoundRect(
+                    left,
+                    top,
+                    left + keyWidth - dp(4),
+                    top + rowHeight - dp(2),
+                    dp(2).toFloat(),
+                    dp(2).toFloat(),
+                    paint
+                )
+            }
+
+            paint.color = accent
+            paint.strokeWidth = dp(2).toFloat()
+            canvas.drawLine(
+                labelWidth, 0f,
+                labelWidth, height.toFloat(), paint
+            )
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                val labelWidth = dp(36).toFloat()
+                val keyWidth = dp(43).toFloat()
+                val rowHeight = dp(13).toFloat()
+
+                if (event.x >= labelWidth) {
+                    val column =
+                        ((event.x - labelWidth) / keyWidth).toInt()
+                    val noteRow = (event.y / rowHeight).toInt()
+                        .coerceIn(0, 11)
+
+                    notePositions.add(column to noteRow)
+                    invalidate()
+
+                    toast(
+                        "Naoty nampidirina: octave $octave"
+                    )
+                } else {
+                    val noteRow = (event.y / rowHeight).toInt()
+                        .coerceIn(0, 11)
+
+                    val noteNames = listOf(
+                        "B", "A#", "A", "G#", "G", "F#",
+                        "F", "E", "D#", "D", "C#", "C"
+                    )
+
+                    toast(
+                        "Lakile ${noteNames[noteRow]} - octave $octave"
+                    )
+                }
+
+                return true
+            }
+
+            return true
+        }
+    }
 
     private fun buildMixer() {
         mixerContainer = row().apply {
@@ -799,10 +634,7 @@ class MainActivity : Activity() {
 
         root.addView(
             mixerContainer,
-            LinearLayout.LayoutParams(
-                -1,
-                dp(120)
-            )
+            LinearLayout.LayoutParams(-1, dp(103))
         )
 
         refreshMixer()
@@ -814,107 +646,70 @@ class MainActivity : Activity() {
         mixerContainer.removeAllViews()
 
         mixerContainer.addView(
-            label(
-                "MIXER",
-                11f,
-                accent,
-                true
-            ),
-            LinearLayout.LayoutParams(
-                dp(58),
-                -1
-            )
+            text("♫ MIXER", 12f, accent, true),
+            LinearLayout.LayoutParams(dp(75), -1)
         )
 
         tracks.forEachIndexed { index, track ->
-
             val channel = column().apply {
                 gravity = Gravity.CENTER
-                setPadding(
-                    dp(3),
-                    dp(2),
-                    dp(3),
-                    dp(2)
+                background = shape(
+                    panelLight, 5, border
                 )
-                setBackgroundColor(
-                    if (index == selectedTrack) {
-                        Color.rgb(38, 48, 56)
-                    } else {
-                        panel
-                    }
-                )
+                setPadding(dp(2), dp(2), dp(2), dp(2))
             }
 
             channel.addView(
-                label(
-                    track,
-                    10f,
-                    white,
-                    true
-                ),
-                LinearLayout.LayoutParams(
-                    -1,
-                    dp(24)
-                )
+                text(track.name, 10f, track.color, true),
+                LinearLayout.LayoutParams(-1, dp(21))
             )
+
+            val controls = row()
+
+            addButton(controls, "M", panel, 1f) {
+                toast("${track.name}: Mute mbola tsy ampidirina")
+            }
+
+            addButton(controls, "S", panel, 1f) {
+                toast("${track.name}: Solo mbola tsy ampidirina")
+            }
+
+            channel.addView(controls)
 
             val volume = SeekBar(this).apply {
                 max = 100
-                progress = 80
-                contentDescription = "$track volume"
+                progress = 75
+                contentDescription = "${track.name} volume"
             }
 
             channel.addView(
                 volume,
                 LinearLayout.LayoutParams(
-                    dp(90),
-                    dp(29)
+                    dp(85), dp(26)
                 )
             )
 
             channel.addView(
-                label(
-                    "VOL",
-                    9f,
-                    muted
-                ),
-                LinearLayout.LayoutParams(
-                    -1,
-                    dp(18)
-                )
+                text("VOL", 8f, muted),
+                LinearLayout.LayoutParams(-1, dp(15))
             )
 
             mixerContainer.addView(
                 channel,
-                LinearLayout.LayoutParams(
-                    dp(105),
-                    -1
-                )
+                LinearLayout.LayoutParams(0, -1, 1f).apply {
+                    setMargins(dp(2), dp(2), dp(2), dp(2))
+                }
             )
         }
 
         val master = column().apply {
             gravity = Gravity.CENTER
-            setPadding(
-                dp(3),
-                dp(2),
-                dp(3),
-                dp(2)
-            )
-            setBackgroundColor(panelLight)
+            background = shape(Color.rgb(5, 49, 56), 5, accent)
         }
 
         master.addView(
-            label(
-                "MASTER",
-                10f,
-                accent,
-                true
-            ),
-            LinearLayout.LayoutParams(
-                -1,
-                dp(24)
-            )
+            text("MASTER", 10f, accent, true),
+            LinearLayout.LayoutParams(-1, dp(22))
         )
 
         val masterVolume = SeekBar(this).apply {
@@ -925,104 +720,81 @@ class MainActivity : Activity() {
 
         master.addView(
             masterVolume,
-            LinearLayout.LayoutParams(
-                dp(90),
-                dp(29)
-            )
+            LinearLayout.LayoutParams(dp(82), dp(30))
         )
 
         master.addView(
-            label(
-                "OUTPUT",
-                9f,
-                muted
-            ),
-            LinearLayout.LayoutParams(
-                -1,
-                dp(18)
-            )
+            text("OUTPUT", 8f, muted),
+            LinearLayout.LayoutParams(-1, dp(15))
         )
 
         mixerContainer.addView(
             master,
-            LinearLayout.LayoutParams(
-                dp(110),
-                -1
-            )
+            LinearLayout.LayoutParams(dp(100), -1).apply {
+                setMargins(dp(2), dp(2), dp(3), dp(2))
+            }
         )
     }
-
-    // --------------------------------------------------
-    // ADD TRACK
-    // --------------------------------------------------
 
     private fun addTrack() {
         trackCounter++
 
-        val newTrack = "Audio $trackCounter"
+        tracks.add(
+            Track(
+                "Audio $trackCounter",
+                Color.rgb(
+                    60 + (trackCounter * 17) % 180,
+                    100 + (trackCounter * 23) % 130,
+                    140 + (trackCounter * 11) % 100
+                )
+            )
+        )
 
-        tracks.add(newTrack)
         selectedTrack = tracks.lastIndex
 
         refreshTracks()
         refreshMixer()
 
-        statusText.text = "Track added: $newTrack"
+        statusText.text = "Track added: ${tracks.last().name}"
     }
-
-    // --------------------------------------------------
-    // EDITING TOOLS
-    // --------------------------------------------------
 
     private fun handleTool(tool: String) {
         when (tool) {
+            "SELECT" -> toast("Safidio ny Track na Clip")
 
-            "SELECT" -> {
-                message("Safidio ny Track na Clip")
-            }
+            "CUT" -> toast("CUT mila audio editing engine")
 
-            "CUT" -> {
-                message("CUT mbola mila audio editing engine")
-            }
+            "COPY" -> toast("COPY mbola tsy ampidirina")
 
-            "COPY" -> {
-                message("COPY mbola tsy ampidirina")
-            }
+            "PASTE" -> toast("PASTE mbola tsy ampidirina")
 
-            "PASTE" -> {
-                message("PASTE mbola tsy ampidirina")
-            }
-
-            "MOVE" -> {
-                message("MOVE mbola tsy ampidirina")
-            }
+            "MOVE" -> toast("MOVE mbola tsy ampidirina")
 
             "DELETE" -> {
                 if (selectedTrack in tracks.indices) {
-                    val deleted = tracks.removeAt(selectedTrack)
+                    val removed = tracks.removeAt(selectedTrack)
 
                     selectedTrack =
-                        if (tracks.isEmpty()) {
-                            -1
-                        } else {
-                            (selectedTrack - 1).coerceAtLeast(0)
-                        }
+                        if (tracks.isEmpty()) -1
+                        else selectedTrack.coerceAtMost(tracks.lastIndex)
 
                     refreshTracks()
                     refreshMixer()
 
-                    statusText.text = "Deleted: $deleted"
+                    statusText.text = "Deleted: ${removed.name}"
                 } else {
-                    message("Tsy misy Track hofafana")
+                    toast("Tsy misy piste hofafana")
                 }
             }
 
             "ZOOM +" -> {
-                message("Zoom mbola hatsaraina")
+                zoom = (zoom + 1).coerceAtMost(3)
+                toast("Zoom: $zoom")
             }
 
             "ZOOM -" -> {
-                message("Zoom mbola hatsaraina")
+                zoom = (zoom - 1).coerceAtLeast(1)
+                toast("Zoom: $zoom")
             }
         }
     }
