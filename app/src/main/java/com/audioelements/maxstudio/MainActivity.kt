@@ -432,12 +432,12 @@ class MainActivity : Activity() {
         trackContainer = column()
 
         scroll.addView(
-    trackContainer,
-    android.widget.ScrollView.LayoutParams(
-        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-        android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-    )
-)
+               trackContainer,
+              android.widget.ScrollView.LayoutParams(
+              android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+              android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
 
         area.addView(
             scroll,
