@@ -431,13 +431,29 @@ class MainActivity : Activity() {
 
         trackContainer = column()
 
-        scroll.addView(
-               trackContainer,
-              android.widget.ScrollView.LayoutParams(
-              android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-              android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
+        val scroll = ScrollView(this).apply {
+    isFillViewport = false
+    isVerticalScrollBarEnabled = true
+}
+
+trackContainer = column()
+
+scroll.addView(
+    trackContainer,
+    LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+    )
+)
+
+       area.addView(
+           scroll,
+           LinearLayout.LayoutParams(
+                -1,
+                0,
+                1f
+           )
+       )
 
         area.addView(
             scroll,
