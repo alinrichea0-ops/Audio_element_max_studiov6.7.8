@@ -1040,3 +1040,386 @@ class MainActivity : Activity() {
             return true
         }
     }
+    private fun buildMixer() {
+        mixerPanel = row().apply {
+            background = shape(panel, 5)
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val menu = col().apply {
+            background = shape(panel, 5)
+        }
+
+        menu.addView(
+            label("☷ MIXER", 13f, cyan, true),
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(36)
+            )
+        )
+
+        listOf(
+            "♫ CHANNELS",
+            "♬ EFFECTS",
+            "⚙ SETTINGS"
+        ).forEach { item ->
+            menu.addView(
+                button(item, panel) {
+                    toast(
+                        when (item) {
+                            "♫ CHANNELS" -> "Mixer channels"
+                            "♬ EFFECTS" ->
+                                "Effects mbola mila audio engine"
+                            else -> "Mixer settings"
+                        }
+                    )
+                },
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(33)
+                )
+            )
+        }
+
+        mixerPanel.addView(
+            menu,
+            LinearLayout.LayoutParams(
+                dp(130),
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        val scroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = true
+        }
+
+        mixerChannels = row()
+
+        scroll.addView(
+            mixerChannels,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        mixerPanel.addView(
+            scroll,
+            LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                1f
+            )
+        )
+
+        root.addView(
+            mixerPanel,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(170)
+            )
+        )
+    }
+
+    private fun refreshMixer() {
+        if (!::mixerChannels.isInitialized) return
+
+        mixerChannels.removeAllViews()
+
+        tracks.forEach { track ->
+            val channel = col().apply {
+                background = shape(panel2, 5)
+                gravity = Gravity.CENTER
+                setPadding(dp(3), dp(2), dp(3), dp(2))
+            }
+
+            channel.addView(
+                label(track.name, 10f, track.color, true),
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(23)
+                )
+            )
+
+            val controls = row()
+
+            weightedButton(
+                controls,
+                "M",
+                if (muteSet.contains(track.name)) red else buttonColor,
+                1f
+            ) {
+                if (!muteSet.add(track.name)) {
+                    muteSet.remove(track.name)
+                }
+                refreshMixer()
+                refreshTracks()
+            }
+
+            weightedButton(
+                controls,
+                "S",
+                if (soloSet.contains(track.name)) {
+                    Color.rgb(0, 112, 106)
+                } else {
+                    buttonColor
+                },
+                1f
+            ) {
+                if (!soloSet.add(track.name)) {
+                    soloSet.remove(track.name)
+                }
+                refreshMixer()
+                refreshTracks()
+            }
+
+            channel.addView(controls)
+
+            val fader = SeekBar(this).apply {
+                max = 100
+                progress = track.volume
+
+                setOnSeekBarChangeListener(
+                    object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(
+                            seekBar: SeekBar?,
+                            progress: Int,
+                            fromUser: Boolean
+                        ) {
+                            if (fromUser) track.volume = progress
+                        }
+
+                        override fun onStartTrackingTouch(
+                            seekBar: SeekBar?
+                        ) {}
+
+                        override fun onStopTrackingTouch(
+                            seekBar: SeekBar?
+                        ) {
+                            refreshTracks()
+                        }
+                    }
+                )
+            }
+
+            channel.addView(
+                fader,
+                LinearLayout.LayoutParams(dp(112), dp(39))
+            )
+
+            channel.addView(
+                label("${track.volume}%", 9f, mutedText),
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(19)
+                )
+            )
+
+            mixerChannels.addView(
+                channel,
+                LinearLayout.LayoutParams(
+                    dp(138),
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                ).apply {
+                    setMargins(dp(3), dp(3), dp(3), dp(3))
+                }
+            )
+        }
+
+        val master = col().apply {
+            gravity = Gravity.CENTER
+            background = shape(
+                Color.rgb(3, 54, 57),
+                5,
+                cyan
+            )
+        }
+
+        master.addView(
+            label("MASTER", 11f, cyan, true),
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(25)
+            )
+        )
+
+        val fader = SeekBar(this).apply {
+            max = 100
+            progress = masterVolume
+
+            setOnSeekBarChangeListener(
+                object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(
+                        seekBar: SeekBar?,
+                        progress: Int,
+                        fromUser: Boolean
+                    ) {
+                        if (fromUser) masterVolume = progress
+                    }
+
+                    override fun onStartTrackingTouch(
+                        seekBar: SeekBar?
+                    ) {}
+
+                    override fun onStopTrackingTouch(
+                        seekBar: SeekBar?
+                    ) {}
+                }
+            )
+        }
+
+        master.addView(
+            fader,
+            LinearLayout.LayoutParams(dp(100), dp(45))
+        )
+
+        master.addView(
+            label("$masterVolume%", 9f, mutedText),
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(18)
+            )
+        )
+
+        mixerChannels.addView(
+            master,
+            LinearLayout.LayoutParams(
+                dp(125),
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ).apply {
+                setMargins(dp(3), dp(3), dp(3), dp(3))
+            }
+        )
+    }
+
+    private fun refreshPanels() {
+        if (::mixerPanel.isInitialized) {
+            mixerPanel.visibility =
+                if (mixerShown) View.VISIBLE else View.GONE
+        }
+
+        if (::pianoPanel.isInitialized) {
+            pianoPanel.visibility =
+                if (pianoShown) View.VISIBLE else View.GONE
+        }
+
+        if (::workspace.isInitialized) {
+            workspace.requestLayout()
+        }
+    }
+
+    private fun addTrack() {
+        val colors = listOf(
+            Color.rgb(0, 220, 185),
+            Color.rgb(20, 135, 255),
+            Color.rgb(153, 75, 255),
+            Color.rgb(255, 145, 20),
+            Color.rgb(255, 40, 90)
+        )
+
+        val name = "Audio $nextTrack"
+
+        tracks.add(
+            Track(name, colors[nextTrack % colors.size], 70)
+        )
+
+        selectedTrack = tracks.lastIndex
+        nextTrack++
+
+        rebuildWorkspace()
+
+        statusText.text = "Track added: $name"
+        toast("$name added")
+    }
+
+    private fun rebuildWorkspace() {
+        workspace.removeAllViews()
+
+        buildWorkspace()
+        buildPiano()
+
+        refreshTracks()
+        refreshMixer()
+        refreshPanels()
+    }
+
+    private fun useTool(tool: String) {
+        selectedTool = tool
+
+        when (tool) {
+            "SELECT" -> toast("Safidio ny track na clip")
+            "CUT" -> toast("CUT mbola mila clip-editing engine")
+            "COPY" -> toast("COPY mbola mila clip-editing engine")
+            "PASTE" -> toast("PASTE mbola mila clip-editing engine")
+            "MOVE" -> toast("MOVE mbola mila clip-editing engine")
+
+            "DELETE" -> {
+                if (selectedTrack in tracks.indices &&
+                    tracks.isNotEmpty()
+                ) {
+                    val removed = tracks.removeAt(selectedTrack)
+
+                    muteSet.remove(removed.name)
+                    soloSet.remove(removed.name)
+
+                    selectedTrack =
+                        if (tracks.isEmpty()) -1
+                        else selectedTrack.coerceAtMost(
+                            tracks.lastIndex
+                        )
+
+                    rebuildWorkspace()
+                    statusText.text = "Deleted: ${removed.name}"
+                } else {
+                    toast("Tsy misy track voafidy")
+                }
+            }
+
+            "ZOOM +" -> {
+                zoom = (zoom + 1).coerceAtMost(3)
+                rebuildWorkspace()
+                toast("Zoom $zoom")
+            }
+
+            "ZOOM -" -> {
+                zoom = (zoom - 1).coerceAtLeast(1)
+                rebuildWorkspace()
+                toast("Zoom $zoom")
+            }
+        }
+    }
+
+    private fun pickAudio() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "audio/*"
+        }
+
+        try {
+            startActivityForResult(intent, 1001)
+        } catch (_: Exception) {
+            toast("Tsy afaka manokatra audio picker")
+        }
+    }
+
+    @Deprecated("Compatible with older Android versions")
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (
+            requestCode == 1001 &&
+            resultCode == RESULT_OK &&
+            data?.data != null
+        ) {
+            importedAudio = data.data
+
+            toast(
+                "Audio voafidy. Mila ampifandraisina amin'ny audio engine izy."
+            )
+        }
+    }
+}
