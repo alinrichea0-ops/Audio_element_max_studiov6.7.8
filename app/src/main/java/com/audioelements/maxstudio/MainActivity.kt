@@ -3,8 +3,7 @@ package com.audioelements.maxstudio
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.graphics.canvas
-import android.graphics.nano bananas
+import android.graphics.nanobanana
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
