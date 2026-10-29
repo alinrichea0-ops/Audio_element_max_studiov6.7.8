@@ -527,3 +527,516 @@ class MainActivity : Activity() {
             )
         )
     }
+    private inner class RulerView : View(this@MainActivity) {
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            canvas.drawColor(panel)
+
+            val cell = dp(65 * zoom).toFloat()
+            p.strokeWidth = dp(1).toFloat()
+            p.textSize = dp(11).toFloat()
+            p.typeface = Typeface.DEFAULT_BOLD
+
+            for (bar in 0..16) {
+                val x = bar * cell
+                p.color = border
+                canvas.drawLine(x, 0f, x, height.toFloat(), p)
+
+                if (bar > 0) {
+                    p.color = mutedText
+                    canvas.drawText(
+                        bar.toString(),
+                        x + dp(5),
+                        dp(19).toFloat(),
+                        p
+                    )
+                }
+            }
+        }
+    }
+
+    private inner class LaneView(
+        private val track: Track
+    ) : View(this@MainActivity) {
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+
+            val idx = tracks.indexOf(track)
+            canvas.drawColor(
+                if (idx == selectedTrack) {
+                    Color.rgb(12, 43, 55)
+                } else {
+                    bg
+                }
+            )
+
+            val cell = dp(65 * zoom).toFloat()
+
+            for (bar in 0..16) {
+                p.color = Color.rgb(24, 48, 69)
+                p.strokeWidth = dp(1).toFloat()
+                canvas.drawLine(
+                    bar * cell, 0f,
+                    bar * cell, height.toFloat(), p
+                )
+            }
+
+            val clips = when (track.name) {
+                "Vocal" -> listOf(
+                    Clip(1, 6, "Vocal_01", false),
+                    Clip(10, 14, "Vocal_02", false)
+                )
+                "Beat" -> listOf(
+                    Clip(1, 11, "Beat_01", false)
+                )
+                "Keyboard" -> listOf(
+                    Clip(1, 8, "Keyboard_01", true),
+                    Clip(10, 16, "Keyboard_02", true)
+                )
+                "Guitar" -> listOf(
+                    Clip(1, 7, "Guitar_01", false),
+                    Clip(9, 14, "Guitar_02", false)
+                )
+                "Bass" -> listOf(
+                    Clip(1, 10, "Bass_01", false)
+                )
+                else -> listOf(
+                    Clip(1, 6, "${track.name}_01", false)
+                )
+            }
+
+            clips.forEach { clip ->
+                val l = clip.start * cell + dp(3)
+                val r = clip.end * cell - dp(3)
+                val top = dp(7).toFloat()
+                val bottom = height - dp(7).toFloat()
+
+                p.color = track.color
+                p.alpha = 220
+
+                canvas.drawRoundRect(
+                    RectF(l, top, r, bottom),
+                    dp(5).toFloat(),
+                    dp(5).toFloat(),
+                    p
+                )
+
+                p.alpha = 255
+                p.color = Color.WHITE
+                p.textSize = dp(10).toFloat()
+                p.typeface = Typeface.DEFAULT_BOLD
+
+                canvas.drawText(
+                    clip.title,
+                    l + dp(7),
+                    top + dp(13),
+                    p
+                )
+
+                if (clip.midi) {
+                    drawNotes(canvas, l, top, r)
+                } else {
+                    drawWave(canvas, l, top, r, bottom)
+                }
+            }
+
+            p.color = border
+            canvas.drawLine(
+                0f, height - 1f,
+                width.toFloat(), height - 1f, p
+            )
+        }
+
+        private fun drawWave(
+            canvas: Canvas,
+            left: Float,
+            top: Float,
+            right: Float,
+            bottom: Float
+        ) {
+            val center = (top + bottom) / 2f
+            p.color = Color.WHITE
+            p.alpha = 185
+            p.strokeWidth = dp(1).toFloat()
+
+            var x = left + dp(5)
+            var i = 0
+            val step = dp(5).toFloat().coerceAtLeast(1f)
+
+            while (x < right - dp(3)) {
+                val amp = dp(
+                    4 + ((i * 17 + track.name.length * 13) % 17)
+                ).toFloat()
+
+                canvas.drawLine(
+                    x, center - amp,
+                    x, center + amp, p
+                )
+
+                x += step
+                i++
+            }
+
+            p.alpha = 255
+        }
+
+        private fun drawNotes(
+            canvas: Canvas,
+            left: Float,
+            top: Float,
+            right: Float
+        ) {
+            p.color = Color.rgb(213, 186, 255)
+
+            var x = left + dp(8)
+            var i = 0
+
+            while (x + dp(15) < right - dp(4)) {
+                val y = top + dp(18 + ((i * 7) % 17))
+
+                canvas.drawRoundRect(
+                    x, y,
+                    x + dp(15), y + dp(3),
+                    dp(1).toFloat(),
+                    dp(1).toFloat(),
+                    p
+                )
+
+                x += dp(22)
+                i++
+            }
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                selectedTrack = tracks.indexOf(track).coerceAtLeast(0)
+                statusText.text = "${track.name} selected"
+                refreshTracks()
+                invalidate()
+                return true
+            }
+
+            return true
+        }
+    }
+
+    private fun refreshTracks() {
+        if (!::trackList.isInitialized) return
+
+        trackList.removeAllViews()
+
+        tracks.forEachIndexed { index, track ->
+            val card = col().apply {
+                setPadding(dp(3), dp(2), dp(3), dp(2))
+                background = shape(
+                    if (index == selectedTrack) {
+                        Color.rgb(12, 43, 55)
+                    } else {
+                        panel
+                    },
+                    4,
+                    track.color
+                )
+            }
+
+            val top = row()
+
+            top.addView(
+                label("${index + 1}", 9f, track.color, true),
+                LinearLayout.LayoutParams(dp(20), dp(22))
+            )
+
+            top.addView(
+                label(track.name, 10f, white, true).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    setOnClickListener {
+                        selectedTrack = index
+                        statusText.text = "Selected: ${track.name}"
+                        refreshTracks()
+                    }
+                },
+                LinearLayout.LayoutParams(0, dp(22), 1f)
+            )
+
+            smallButton(top, "M", muteSet.contains(track.name)) {
+                if (!muteSet.add(track.name)) {
+                    muteSet.remove(track.name)
+                }
+                refreshTracks()
+                refreshMixer()
+            }
+
+            smallButton(top, "S", soloSet.contains(track.name)) {
+                if (!soloSet.add(track.name)) {
+                    soloSet.remove(track.name)
+                }
+                refreshTracks()
+                refreshMixer()
+            }
+
+            card.addView(top)
+
+            val vr = row()
+
+            val seek = SeekBar(this).apply {
+                max = 100
+                progress = track.volume
+
+                setOnSeekBarChangeListener(
+                    object : SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(
+                            seekBar: SeekBar?,
+                            progress: Int,
+                            fromUser: Boolean
+                        ) {
+                            if (fromUser) track.volume = progress
+                        }
+
+                        override fun onStartTrackingTouch(
+                            seekBar: SeekBar?
+                        ) {}
+
+                        override fun onStopTrackingTouch(
+                            seekBar: SeekBar?
+                        ) {
+                            refreshMixer()
+                        }
+                    }
+                )
+            }
+
+            vr.addView(
+                seek,
+                LinearLayout.LayoutParams(0, dp(22), 1f)
+            )
+
+            vr.addView(
+                label("${track.volume}%", 8f, mutedText),
+                LinearLayout.LayoutParams(dp(38), dp(22))
+            )
+
+            card.addView(vr)
+
+            trackList.addView(
+                card,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(58)
+                ).apply {
+                    setMargins(dp(1), dp(1), dp(1), dp(1))
+                }
+            )
+        }
+    }
+
+    private fun smallButton(
+        parent: LinearLayout,
+        title: String,
+        active: Boolean,
+        action: () -> Unit
+    ) {
+        parent.addView(
+            button(
+                title,
+                if (active) Color.rgb(0, 112, 106)
+                else buttonColor,
+                action
+            ),
+            LinearLayout.LayoutParams(dp(26), dp(24)).apply {
+                setMargins(dp(1), 0, dp(1), 0)
+            }
+        )
+    }
+
+    private fun buildPiano() {
+        pianoPanel = col().apply {
+            background = shape(panel, 5)
+        }
+
+        val head = row().apply {
+            setBackgroundColor(panel)
+        }
+
+        head.addView(
+            label("♫ KEYBOARD / PIANO ROLL", 12f, cyan, true),
+            LinearLayout.LayoutParams(0, dp(34), 1f)
+        )
+
+        weightedButton(head, "OCT −", buttonColor, 0.6f) {
+            pianoView.octave =
+                (pianoView.octave - 1).coerceAtLeast(1)
+            pianoView.invalidate()
+        }
+
+        weightedButton(head, "OCT +", buttonColor, 0.6f) {
+            pianoView.octave =
+                (pianoView.octave + 1).coerceAtMost(7)
+            pianoView.invalidate()
+        }
+
+        weightedButton(head, "CLEAR", buttonColor, 0.6f) {
+            notes.clear()
+            pianoView.invalidate()
+        }
+
+        pianoPanel.addView(head)
+
+        pianoView = PianoView()
+
+        val scroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = true
+        }
+
+        scroll.addView(
+            pianoView,
+            ViewGroup.LayoutParams(dp(1300), dp(156))
+        )
+
+        pianoPanel.addView(
+            scroll,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        )
+
+        workspace.addView(
+            pianoPanel,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(194)
+            )
+        )
+    }
+
+    private inner class PianoView : View(this@MainActivity) {
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        var octave = 4
+
+        private val rowHeight get() = dp(13).toFloat()
+        private val labelWidth get() = dp(38).toFloat()
+        private val keyWidth get() = dp(48).toFloat()
+
+        private val black = setOf(1, 3, 6, 8, 10)
+
+        private val names = listOf(
+            "B", "A#", "A", "G#", "G", "F#",
+            "F", "E", "D#", "D", "C#", "C"
+        )
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            canvas.drawColor(bg)
+
+            for (r in 0 until 12) {
+                val top = r * rowHeight
+                val bottom = top + rowHeight
+                val isBlack = (11 - r) in black
+
+                p.color = if (isBlack) {
+                    Color.rgb(25, 38, 55)
+                } else {
+                    Color.rgb(219, 231, 242)
+                }
+
+                canvas.drawRect(
+                    0f, top, labelWidth, bottom, p
+                )
+
+                p.color = if (isBlack) {
+                    Color.rgb(15, 29, 46)
+                } else {
+                    Color.rgb(8, 23, 39)
+                }
+
+                canvas.drawRect(
+                    labelWidth, top, width.toFloat(), bottom, p
+                )
+
+                p.color = border
+                canvas.drawLine(
+                    labelWidth, bottom,
+                    width.toFloat(), bottom, p
+                )
+
+                p.color = if (isBlack) Color.BLACK else Color.DKGRAY
+                p.textSize = dp(8).toFloat()
+
+                canvas.drawText(
+                    names[r],
+                    dp(3).toFloat(),
+                    bottom - dp(3),
+                    p
+                )
+            }
+
+            val count =
+                ((width - labelWidth) / keyWidth).toInt() + 1
+
+            for (c in 0..count) {
+                val x = labelWidth + c * keyWidth
+                p.color = if (c % 4 == 0) {
+                    Color.rgb(42, 89, 121)
+                } else {
+                    Color.rgb(22, 49, 73)
+                }
+
+                canvas.drawLine(
+                    x, 0f, x, height.toFloat(), p
+                )
+            }
+
+            notes.forEach { (column, r) ->
+                val l = labelWidth + column * keyWidth + dp(2)
+                val top = r * rowHeight + dp(1)
+
+                p.color = Color.rgb(165, 83, 255)
+
+                canvas.drawRoundRect(
+                    l, top,
+                    l + keyWidth - dp(4),
+                    top + rowHeight - dp(2),
+                    dp(2).toFloat(),
+                    dp(2).toFloat(),
+                    p
+                )
+            }
+
+            p.color = cyan
+            p.strokeWidth = dp(2).toFloat()
+
+            canvas.drawLine(
+                labelWidth, 0f,
+                labelWidth, height.toFloat(), p
+            )
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                if (event.x < labelWidth) {
+                    toast("Piano key — octave $octave")
+                    return true
+                }
+
+                val c = ((event.x - labelWidth) / keyWidth)
+                    .toInt().coerceAtLeast(0)
+
+                val r = (event.y / rowHeight)
+                    .toInt().coerceIn(0, 11)
+
+                val note = c to r
+
+                if (!notes.remove(note)) notes.add(note)
+
+                invalidate()
+                return true
+            }
+
+            return true
+        }
+    }
