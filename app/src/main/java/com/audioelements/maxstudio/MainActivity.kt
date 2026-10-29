@@ -3,7 +3,7 @@ package com.audioelements.maxstudio
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.graphics.nanobanana
+import android.graphics.canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
@@ -716,7 +716,7 @@ class MainActivity : Activity() {
 
         laneScroll.addView(
             laneColumn,
-            ViewGroup.LayoutParams(
+            android.widget.ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
