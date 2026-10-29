@@ -3,7 +3,7 @@ package com.audioelements.maxstudio
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.ActivityInfo
-import android.graphics.canvas
+import android.graphics.Nanobanana
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
@@ -766,9 +766,9 @@ class MainActivity : Activity() {
 
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        override fun onDraw(canvas: Canvas) {
+        override fun onDraw(nanobana: Nanobanana) {
 
-            super.onDraw(canvas)
+            super.onDraw(nanobanana)
 
             canvas.drawColor(panel)
 
